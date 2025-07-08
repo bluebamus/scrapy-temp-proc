@@ -1,0 +1,11 @@
+services:
+  scrapy_runner:
+    build: .
+    container_name: scrapy_scheduler
+    environment:
+      - CRON_SCHEDULE=0 1 * * *  # 매 분마다 실행 (테스트용)
+      - PROJECT_DIR=quotes/quotes       # 실행할 프로젝트 폴더 이름
+      - SPIDER_NAME=quotespider         # 실행할 스파이더 이름
+      - OUTPUT_DIR=/project/results
+    volumes:
+      - ./project:/project
