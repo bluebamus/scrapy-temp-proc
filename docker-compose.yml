@@ -2,10 +2,19 @@ services:
   scrapy_runner:
     build: .
     container_name: scrapy_scheduler
+    restart: unless-stopped
     environment:
-      - CRON_SCHEDULE=0 1 * * *  # 매 분마다 실행 (테스트용)
-      - PROJECT_DIR=quotes/quotes       # 실행할 프로젝트 폴더 이름
+      - CRON_SCHEDULE=0 1 * * *         # 매일 01:00 (TZ 기준)
+      - TZ=Asia/Seoul                   # 스케줄·파일명 시간대
+      - PROJECT_DIR=quotes              # scrapy.cfg가 있는 프로젝트 폴더
       - SPIDER_NAME=quotespider         # 실행할 스파이더 이름
       - OUTPUT_DIR=/project/results
+      - HOST_UID=${HOST_UID:-1000}      # 결과 파일 소유자 (서버 배포 계정)
+      - HOST_GID=${HOST_GID:-1000}
     volumes:
       - ./project:/project
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

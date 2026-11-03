@@ -4,21 +4,25 @@
 # https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 
 from scrapy import signals
+from scrapy.exceptions import NotConfigured
 import random
 
 # useful for handling different item types with a single interface
 from itemadapter import is_item, ItemAdapter
 
 class RotateUserAgentAndProxyMiddleware:
-    def __init__(self, user_agents, proxies):
+    def __init__(self, user_agents, proxies, max_retries):
         self.user_agents = user_agents
         self.proxies = proxies
+        self.max_retries = max_retries
 
     @classmethod
     def from_crawler(cls, crawler):
         user_agents = crawler.settings.getlist('USER_AGENT_LIST')
         proxies = crawler.settings.getlist('PROXY_LIST')
-        return cls(user_agents, proxies)
+        if not user_agents or not proxies:
+            raise NotConfigured('USER_AGENT_LIST / PROXY_LIST 가 비어 있음')
+        return cls(user_agents, proxies, crawler.settings.getint('ROTATE_MAX_RETRIES', 3))
 
     def process_request(self, request, spider):
         user_agent = random.choice(self.user_agents)
@@ -27,27 +31,25 @@ class RotateUserAgentAndProxyMiddleware:
         request.meta['proxy'] = proxy
         spider.logger.info(f'Using user-agent: {user_agent}, proxy: {proxy}')
 
+    def _retry(self, request, reason, spider):
+        # 무한 재시도 방지: 요청마다 횟수를 meta 에 기록하고 상한에서 멈춘다
+        retries = request.meta.get('rotate_retry_times', 0) + 1
+        if retries > self.max_retries:
+            spider.logger.warning(f'Giving up {request.url} after {self.max_retries} retries ({reason})')
+            return None
+        spider.logger.info(f'{reason}. Rotating user-agent/proxy, retry {retries}/{self.max_retries}')
+        new_request = request.copy()
+        new_request.meta['rotate_retry_times'] = retries
+        new_request.dont_filter = True
+        return new_request  # process_request 가 새 UA/프록시를 다시 고른다
+
     def process_response(self, request, response, spider):
         if response.status != 200:
-            user_agent = random.choice(self.user_agents)
-            proxy = random.choice(self.proxies)
-            spider.logger.info(f'Changing user-agent to: {user_agent}, proxy to: {proxy}, retrying...')
-            new_request = request.copy()
-            new_request.headers['User-Agent'] = user_agent
-            new_request.meta['proxy'] = proxy
-            new_request.dont_filter = True
-            return new_request
+            return self._retry(request, f'HTTP {response.status}', spider) or response
         return response
 
     def process_exception(self, request, exception, spider):
-        user_agent = random.choice(self.user_agents)
-        proxy = random.choice(self.proxies)
-        spider.logger.info(f'Exception: {exception}. Changing user-agent to: {user_agent}, proxy to: {proxy}, retrying...')
-        new_request = request.copy()
-        new_request.headers['User-Agent'] = user_agent
-        new_request.meta['proxy'] = proxy
-        new_request.dont_filter = True
-        return new_request
+        return self._retry(request, f'Exception: {exception}', spider)
 
 class RotateUserAgentMiddleware:
     def __init__(self, user_agents):
@@ -56,6 +58,8 @@ class RotateUserAgentMiddleware:
     @classmethod
     def from_crawler(cls, crawler):
         user_agents = crawler.settings.getlist('USER_AGENT_LIST')
+        if not user_agents:
+            raise NotConfigured('USER_AGENT_LIST 가 비어 있음')
         return cls(user_agents)
 
     def process_request(self, request, spider):

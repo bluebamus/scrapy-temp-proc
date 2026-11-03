@@ -1,0 +1,9 @@
+.git
+.claude
+**/__pycache__
+**/*.pyc
+**/tests
+project/results/*
+project/**/*.json
+project/**/*.xlsx
+project/**/*.db

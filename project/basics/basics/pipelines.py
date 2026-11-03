@@ -8,34 +8,38 @@
 from itemadapter import ItemAdapter
 from scrapy.exceptions import DropItem
 import openpyxl
+import re
 import sqlite3
+
+
+def _stock(adapter):
+    # "In stock (22 available)" -> 22, 형식이 다르거나 값이 없으면 0
+    match = re.search(r'\((\d+) available\)', adapter.get('availability') or '')
+    return int(match.group(1)) if match else 0
+
+
+def _normalize(adapter):
+    adapter['availability'] = str(_stock(adapter))
+    for field in ('price_exc_tax', 'price_inc_tax', 'tax'):
+        if adapter.get(field):
+            adapter[field] = adapter[field].replace('£', '$')
 
 
 class BasicsPipeline:
     def process_item(self, item, spider):
         adapter = ItemAdapter(item)
-        adapter['name'] = adapter['name'].upper()
-        available_no = adapter.get('availability').split('(')[-1].split(' ')[0]
-        adapter['availability'] = available_no
-        adapter['price_exc_tax'] = adapter.get('price_exc_tax').replace('£', '$')
-        adapter['price_inc_tax'] = adapter.get('price_inc_tax').replace('£', '$')
-        adapter['tax'] = adapter.get('tax').replace('£', '$')
-
+        if adapter.get('name'):
+            adapter['name'] = adapter['name'].upper()
+        _normalize(adapter)
         return item
 
 class DropperPipeline:
     def process_item(self, item, spider):
         adapter = ItemAdapter(item)
-        available_no = adapter.get('availability').split('(')[-1].split(' ')[0]
-        if int(available_no) >= 10:
-            adapter['availability'] = available_no
-            adapter['price_exc_tax'] = adapter.get('price_exc_tax').replace('£', '$')
-            adapter['price_inc_tax'] = adapter.get('price_inc_tax').replace('£', '$')
-            adapter['tax'] = adapter.get('tax').replace('£', '$')
-
-            return item
-        else:
+        if _stock(adapter) < 10:
             raise DropItem(f'Not enough stock for {adapter.get("name")}')
+        _normalize(adapter)
+        return item
 
 class ExcelPipeline:
     def open_spider(self, spider):

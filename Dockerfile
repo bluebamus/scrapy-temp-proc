@@ -1,20 +1,18 @@
-# 기본 이미지로 Python 3.9 사용
-FROM python:latest
+# python:latest 대신 버전 고정 (빌드 시점마다 결과가 달라지지 않도록)
+FROM python:3.12-slim
 
-# cron 설치
-RUN apt-get update && apt-get -y install cron
+# cron, 시간대 데이터 설치
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends cron tzdata \
+    && rm -rf /var/lib/apt/lists/*
 
-# 작업 디렉토리 설정
 WORKDIR /project
 
-# 프로젝트 소스 코드 및 관련 파일 복사
+# 의존성을 먼저 설치해 코드 변경 시 레이어 캐시 재사용
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
 COPY ./project/ /project/
 
-# Python 종속성 설치
-RUN pip install scrapy
-
-# entrypoint.sh 스크립트에 실행 권한 부여
-RUN chmod +x /project/entrypoint.sh
-
-# 컨테이너 실행 시 entrypoint.sh 스크립트 실행
-CMD ["/project/entrypoint.sh"]
+# bash로 실행: 볼륨 마운트로 실행 비트가 사라져도 동작
+CMD ["bash", "/project/entrypoint.sh"]
