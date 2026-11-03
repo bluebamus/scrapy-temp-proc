@@ -1,6 +1,9 @@
 services:
   scrapy_runner:
-    build: .
+    build:
+      context: .
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.15}   # 3.15 이상만 허용 (Dockerfile 에서 검사)
     container_name: scrapy_scheduler
     restart: unless-stopped
     init: true                          # cron 은 PID 1 로 SIGTERM 을 처리하지 못함 -> tini 가 시그널 전달

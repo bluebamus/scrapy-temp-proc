@@ -1,5 +1,10 @@
-# python:latest 대신 버전 고정 (빌드 시점마다 결과가 달라지지 않도록)
-FROM python:3.12-slim
+# Python 3.15 이상. 3.15-slim 태그는 빌드 시점의 최신 3.15.x 패치를 받는다
+# (새 패치 반영: docker compose build --pull / 상위 버전: PYTHON_VERSION=3.16 처럼 지정)
+ARG PYTHON_VERSION=3.15
+FROM python:${PYTHON_VERSION}-slim
+
+# 3.15 미만 이미지로 빌드되면 여기서 실패시킨다
+RUN python -c "import sys; assert sys.version_info >= (3, 15), 'Python 3.15+ required, got ' + sys.version"
 
 # cron, 시간대 데이터 설치
 RUN apt-get update \
