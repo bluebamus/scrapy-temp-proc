@@ -3,6 +3,7 @@ services:
     build: .
     container_name: scrapy_scheduler
     restart: unless-stopped
+    init: true                          # cron 은 PID 1 로 SIGTERM 을 처리하지 못함 -> tini 가 시그널 전달
     environment:
       - CRON_SCHEDULE=0 1 * * *         # 매일 01:00 (TZ 기준)
       - TZ=Asia/Seoul                   # 스케줄·파일명 시간대

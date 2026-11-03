@@ -25,11 +25,11 @@ if [ -n "${HOST_UID:-}" ]; then
   CHOWN_CMD="; chown -R ${HOST_UID}:${HOST_GID:-$HOST_UID} ${OUTPUT_DIR}"
 fi
 
-# crontab 내에서 '%' 는 \% 로 이스케이프해야 함. 로그는 PID 1(cron)의 stdout = docker logs
+# crontab 내에서 '%' 는 \% 로 이스케이프해야 함. 로그는 PID 1 의 stdout = docker logs
 echo "${CRON_SCHEDULE} cd /project/${PROJECT_DIR} && ${SCRAPY_CMD} crawl ${SPIDER_NAME} -o ${OUTPUT_DIR}/${SPIDER_NAME}_\$(date +\\%Y-\\%m-\\%d_\\%H-\\%M-\\%S).json >> /proc/1/fd/1 2>&1${CHOWN_CMD}" | crontab -
 
 echo "Crontab이 다음과 같이 설정되었습니다:"
 crontab -l
 
-# exec: cron 이 PID 1 이 되어 docker stop(SIGTERM)을 직접 받음
+# exec: 셸을 남기지 않고 cron 으로 교체 (docker stop 시그널은 compose 의 init: true 가 전달)
 exec cron -f
