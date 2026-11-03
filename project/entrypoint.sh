@@ -26,7 +26,11 @@ if [ -n "${HOST_UID:-}" ]; then
 fi
 
 # crontab 내에서 '%' 는 \% 로 이스케이프해야 함. 로그는 PID 1 의 stdout = docker logs
-echo "${CRON_SCHEDULE} cd /project/${PROJECT_DIR} && ${SCRAPY_CMD} crawl ${SPIDER_NAME} -o ${OUTPUT_DIR}/${SPIDER_NAME}_\$(date +\\%Y-\\%m-\\%d_\\%H-\\%M-\\%S).json >> /proc/1/fd/1 2>&1${CHOWN_CMD}" | crontab -
+# cron 작업은 Dockerfile ENV 를 상속받지 않으므로 crontab 에 직접 선언 (root 소유 __pycache__ 방지)
+{
+echo "PYTHONDONTWRITEBYTECODE=1"
+echo "${CRON_SCHEDULE} cd /project/${PROJECT_DIR} && ${SCRAPY_CMD} crawl ${SPIDER_NAME} -o ${OUTPUT_DIR}/${SPIDER_NAME}_\$(date +\\%Y-\\%m-\\%d_\\%H-\\%M-\\%S).json >> /proc/1/fd/1 2>&1${CHOWN_CMD}"
+} | crontab -
 
 echo "Crontab이 다음과 같이 설정되었습니다:"
 crontab -l
